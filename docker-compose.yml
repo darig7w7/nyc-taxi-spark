@@ -1,0 +1,72 @@
+name: nyc-taxi-spark
+
+services:
+
+  spark-master:
+    image: apache/spark:3.5.5
+    container_name: nyc-spark-master
+    user: root
+    command:
+      - /opt/spark/bin/spark-class
+      - org.apache.spark.deploy.master.Master
+    ports:
+      - "8080:8080"
+      - "7077:7077"
+    networks:
+      - nyc-net
+
+  spark-worker:
+    image: apache/spark:3.5.5
+    container_name: nyc-spark-worker
+    user: root
+    depends_on:
+      - spark-master
+    volumes:
+      - ./data:/app/data
+      - ./output:/app/output
+    command:
+      - /opt/spark/bin/spark-class
+      - org.apache.spark.deploy.worker.Worker
+      - spark://spark-master:7077
+    networks:
+      - nyc-net
+
+  spark-job:
+    image: apache/spark:3.5.5
+    container_name: nyc-spark-job
+    user: root
+    depends_on:
+      - spark-master
+      - spark-worker
+    volumes:
+      - ./src:/app/src
+      - ./data:/app/data
+      - ./output:/app/output
+    working_dir: /app
+    command:
+      - /opt/spark/bin/spark-submit
+      - src/analytics.py
+    networks:
+      - nyc-net
+
+  superset:
+    build:
+      context: .
+      dockerfile: Dockerfile.superset
+    container_name: nyc-superset
+    ports:
+      - "8088:8088"
+    environment:
+      - SUPERSET_SECRET_KEY=nyc_taxi_secret_2026
+    volumes:
+      - superset_data:/app/superset_home
+      - ./output:/app/output
+    networks:
+      - nyc-net
+
+volumes:
+  superset_data:
+
+networks:
+  nyc-net:
+    name: nyc-taxi-net
