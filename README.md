@@ -405,6 +405,8 @@ Arrastra los graficos -> Save
 
 Comparativa abril 2019-2026:
 
+![NYC Yellow Taxi](docs/output_resultados.png)
+
 ```
 +----+------------+---------------+----------------+--------------+
 |anio|total_viajes|tarifa_promedio|propina_promedio|total_promedio|
