@@ -35,12 +35,6 @@ un dashboard interactivo en Apache Superset que responde:
 ## Flujo del proyecto
 
 ```
-ETAPA 1       ETAPA 2            ETAPA 3          ETAPA 4         ETAPA 5
-Descarga  ->  Cluster Spark  ->  Job PySpark  ->  DuckDB      ->  Superset
-wget TLC      docker compose     analytics.py     nyc_taxi.db     Dashboard
-8 Parquet     Master + Worker    28M registros    SQL sobre        localhost
-433 MB        Superset           Parquet limpio   Parquet          :8088
-```
 ![NYC Yellow Taxi](taxis.png)
 ---
 
