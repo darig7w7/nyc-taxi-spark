@@ -41,7 +41,7 @@ wget TLC      docker compose     analytics.py     nyc_taxi.db     Dashboard
 8 Parquet     Master + Worker    28M registros    SQL sobre        localhost
 433 MB        Superset           Parquet limpio   Parquet          :8088
 ```
-
+![NYC Yellow Taxi](taxis.png)
 ---
 
 ## Tecnologias
