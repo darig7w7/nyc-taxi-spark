@@ -32,7 +32,7 @@ un dashboard interactivo en Apache Superset que responde:
 
 ---
 
-## Flujo del proyecto
+## Diagrama de diseno del sistema
 
 ![NYC Yellow Taxi](taxis.png)
 ---
