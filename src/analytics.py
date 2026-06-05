@@ -70,7 +70,7 @@ for anio in anios:
         )
 
     resultados.append(res)
-    print(f"  ✅ {anio} procesado")
+    print(f"   {anio} procesado")
 
 # Combinar resultados
 from functools import reduce
