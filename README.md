@@ -274,6 +274,7 @@ RESULTADO FINAL
 +----+------------+---------------+----------------+--------------+
 Job completado!
 ```
+<img width="1748" height="393" alt="resumen-anual-nyc-taxi-2019-2026-2026-06-05T03-28-49 378Z" src="https://github.com/user-attachments/assets/b195a1fb-8929-43e5-9aa0-44822aef6dcb" />
 
 Verifica los resultados:
 ```bash
