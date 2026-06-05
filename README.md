@@ -48,6 +48,14 @@ un dashboard interactivo en Apache Superset que responde:
 | Apache Superset | latest | Dashboard interactivo |
 | Docker Compose | 2.x | Orquestacion de todos los servicios |
 
+
+---
+
+## Análisis de Tradeoffs del Stack Tecnológico
+
+📊 [Ver presentación HTML](https://darig7w7.github.io/nyc-taxi-spark/Presentacion%20de%20los%20tradeoffs.html)
+
+
 ---
 
 ## Estructura del proyecto
