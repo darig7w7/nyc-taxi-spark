@@ -34,7 +34,6 @@ un dashboard interactivo en Apache Superset que responde:
 
 ## Flujo del proyecto
 
-```
 ![NYC Yellow Taxi](taxis.png)
 ---
 
