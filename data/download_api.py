@@ -42,7 +42,7 @@ def descargar_mes(anio, mes, total=100000):
             break
 
         todos.extend(data)
-        print(f"  ✅ {len(todos):,} filas")
+        print(f"  {len(todos):,} filas")
         offset += LIMITE
         time.sleep(1)
 
@@ -51,7 +51,7 @@ def descargar_mes(anio, mes, total=100000):
 print("=" * 50)
 print("  NYC TAXI — DESCARGA INTERACTIVA VIA API")
 print("=" * 50)
-print(f"Token: {'✅ OK' if APP_TOKEN else '❌ falta en .env'}\n")
+print(f"Token: {'OK' if APP_TOKEN else 'falta en .env'}\n")
 
 anio  = int(input("Año  (ej: 2016): "))
 mes_i = int(input("Mes inicio (1=Ene): "))
@@ -70,6 +70,6 @@ df_final.to_csv(output, index=False)
 
 size = os.path.getsize(output)/1024/1024
 print(f"\n{'='*50}")
-print(f"✅ Total:    {len(df_final):,} filas")
-print(f"✅ Archivo:  {output} ({size:.1f} MB)")
+print(f" Total:    {len(df_final):,} filas")
+print(f" Archivo:  {output} ({size:.1f} MB)")
 print(f"{'='*50}")
