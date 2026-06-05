@@ -605,12 +605,12 @@ https://d37ci6vzurychx.cloudfront.net/misc/taxi_zone_lookup.csv
 
 ## Autores
 
--
--
--
--
--
--
+- CHINO HUAYCANI MELBIS
+- MAMANI QUISPE DARWIN RIGOBERTO
+- MENDOZA MAMANI LENIN BISMARX
+- QUISPE CARTAGENA JOSE JHONATAN
+- TACO AVILES MILTON HIROSHI
+- VILCA QUISPE OSCAR EDY
 
 ## Repositorio
 
