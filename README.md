@@ -512,6 +512,73 @@ minutos — algo que con Hadoop requeriria escribir Java verboso
 y tardaria mucho mas por escribir en disco entre cada fase.
 
 ---
+---
+
+## Spark vs Hadoop MapReduce
+
+---
+
+## Preguntas de Discusión
+
+### 1. Diferencia entre un Spark Driver y Spark Workers
+
+* **Spark Driver:** Es el orquestador que lee el código de la aplicación, crea el plan de ejecución y asigna los recursos necesarios. No procesa directamente los grandes volúmenes de datos.
+
+* **Spark Workers (Executors):** Son los nodos encargados de ejecutar las tareas enviadas por el Driver. Procesan los datos distribuidos y almacenan información temporal en memoria para acelerar las operaciones.
+
+**Ejemplo en el caso de transporte:**
+
+El Driver analiza el script PySpark y determina que para ejecutar un `groupBy("city", "route_id")` será necesario redistribuir datos entre nodos mediante un proceso de *shuffle*. Los Workers son los que leen las particiones del archivo `viajes_transporte.csv`, eliminan registros inválidos como distancias negativas (`distance_km >= 0`) y calculan la duración de los viajes utilizando las columnas `start_time` y `end_time`.
+
+---
+
+### 2. ¿Por qué Parquet es útil para analítica?
+
+Parquet es un formato de almacenamiento **columnar** que guarda los datos por columnas en lugar de por filas. Además, almacena metadatos y estadísticas que permiten reducir el volumen de lectura y mejorar significativamente el rendimiento de las consultas analíticas.
+
+**Ventajas principales:**
+
+* Alta compresión de datos.
+* Lectura selectiva de columnas.
+* Menor consumo de memoria.
+* Excelente integración con Apache Spark.
+
+**Ejemplo en el caso de transporte:**
+
+Si un planificador urbano necesita calcular el total de pasajeros de la ciudad de Lima:
+
+```sql
+SELECT SUM(total_passengers)
+FROM dataset
+WHERE city = 'Lima';
+```
+
+Parquet permite leer únicamente las columnas necesarias para la consulta e ignorar columnas como `avg_duration_minutes`. Además, gracias al particionado por ciudad y a las estadísticas almacenadas, Spark puede omitir automáticamente bloques completos de datos que no correspondan a Lima.
+
+---
+
+### 3. ¿En qué se diferencia Spark de Hadoop MapReduce?
+
+La principal diferencia está en la forma en que gestionan los datos intermedios durante el procesamiento.
+
+* **Hadoop MapReduce** escribe los resultados intermedios en disco (HDFS) después de cada etapa.
+* **Apache Spark** mantiene los resultados intermedios en memoria RAM siempre que sea posible, reduciendo drásticamente los tiempos de ejecución.
+
+| Aspecto                  | Hadoop MapReduce | Apache Spark                 |
+| ------------------------ | ---------------- | ---------------------------- |
+| Procesamiento intermedio | Disco (HDFS)     | Memoria RAM                  |
+| Velocidad                | Menor            | Mucho mayor                  |
+| Latencia                 | Alta             | Baja                         |
+| Modelo de ejecución      | Map y Reduce     | DAG (Directed Acyclic Graph) |
+| Analítica interactiva    | Limitada         | Excelente                    |
+
+**Ejemplo en el caso de transporte:**
+
+Con Hadoop MapReduce, después de limpiar los registros inválidos, los datos serían escritos en disco. Posteriormente serían leídos nuevamente para calcular la duración de los viajes y volverían a guardarse antes de realizar las agregaciones finales.
+
+Con Spark, el DataFrame de viajes limpios permanece en memoria dentro de los Workers. Las operaciones de limpieza, cálculo de duración y agregación se ejecutan de manera encadenada sin escribir en disco hasta el momento final de exportar los resultados en formato Parquet.
+
+---
 
 ## Limpieza
 
