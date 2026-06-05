@@ -412,9 +412,11 @@ Arrastra los graficos -> Save
 
 ## Resultados e insights
 
-Comparativa abril 2019-2026:
+Comparativa abril 2019-2026 (Terminal):
 
 ![NYC Yellow Taxi](docs/output_resultados.png)
+
+Comparativa abril 2019-2026 (Dashboard):
 
 ![NYC Yellow Taxi](docs/output_dashboards.png)
 
