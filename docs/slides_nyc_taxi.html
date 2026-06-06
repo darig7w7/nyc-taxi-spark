@@ -1,0 +1,1042 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NYC Yellow Taxi — Apache Spark Analytics</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #F8F7F2;
+    --dark: #1A1A1A;
+    --mid: #3A3A3A;
+    --muted: #888;
+    --border: #E0DED8;
+    --yellow: #00C2FF;
+    --yellow-light: #e8f4f8;
+    --red: #C0392B;
+    --green: #1E7A4E;
+    --blue: #1A5276;
+    --accent: #2C3E50;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'IBM Plex Sans', sans-serif;
+    background: var(--bg);
+    color: var(--dark);
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+  }
+
+  /* PROGRESS */
+  .progress {
+    position: fixed;
+    top: 0; left: 0;
+    height: 2px;
+    background: var(--yellow);
+    transition: width 0.5s ease;
+    z-index: 100;
+  }
+
+  /* SLIDE COUNTER */
+  .counter {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: #555;
+    letter-spacing: 2px;
+    padding: 0 4px;
+  }
+
+  /* NAV TOP RIGHT */
+  .nav-top {
+    position: fixed;
+    top: 14px;
+    right: 20px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    z-index: 200;
+  }
+  .nav-btn {
+    background: none;
+    border: none;
+    color: #3a3a3a;
+    cursor: pointer;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.5px;
+    padding: 4px 8px;
+    transition: color 0.2s;
+    border-radius: 2px;
+  }
+  .nav-btn:hover { color: #888; }
+  .nav-btn:disabled { opacity: 0.2; cursor: default; }
+  .nav-btn:disabled:hover { color: #3a3a3a; }
+
+  /* DOTS */
+  .dots {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 8px;
+    z-index: 100;
+  }
+  .dot {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: var(--border);
+    cursor: pointer;
+    transition: all 0.3s;
+  }
+  .dot.active { background: var(--yellow); transform: scale(1.4); }
+
+  /* SLIDES */
+  .slide {
+    position: absolute;
+    width: 100%; height: 100%;
+    opacity: 0;
+    transform: translateX(40px);
+    transition: all 0.5s cubic-bezier(0.4,0,0.2,1);
+    pointer-events: none;
+    display: grid;
+  }
+  .slide.active { opacity: 1; transform: translateX(0); pointer-events: all; }
+  .slide.exit { opacity: 0; transform: translateX(-40px); }
+
+  /* SHARED COMPONENTS */
+  .slide-tag {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+
+  .slide-heading {
+    font-size: 36px;
+    font-weight: 700;
+    line-height: 1.1;
+    color: var(--dark);
+    margin-bottom: 20px;
+  }
+
+  .slide-heading em {
+    font-style: normal;
+    color: var(--yellow);
+    border-bottom: 3px solid var(--yellow);
+  }
+
+  .label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+
+  /*  SLIDE 1 — INTRO + DATOS  */
+  .s1 {
+    grid-template-columns: 1fr 1fr;
+    background: var(--dark);
+    color: #f0f0f0;
+  }
+
+  .s1-left {
+    padding: 64px 56px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    border-right: 1px solid #2a2a2a;
+  }
+
+  .s1 .slide-tag { color: #555; }
+  .s1 .slide-heading { color: #f0f0f0; font-size: 42px; }
+  .s1 .slide-heading em { color: var(--yellow); border-color: var(--yellow); }
+
+  .s1-desc {
+    font-size: 14px;
+    color: #888;
+    line-height: 1.7;
+    font-weight: 300;
+    max-width: 380px;
+    margin-bottom: 40px;
+  }
+
+  .s1-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(226,90,28,0.10);
+    border: 1px solid rgba(226,90,28,0.4);
+    padding: 8px 14px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--yellow);
+    letter-spacing: 1px;
+  }
+
+  .s1-right {
+    padding: 64px 48px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0;
+  }
+
+  .s1-right .label { color: #555; }
+
+  .year-row {
+    display: grid;
+    grid-template-columns: 52px 1fr 80px 70px;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid #222;
+  }
+  .year-row:first-of-type { border-top: 1px solid #222; }
+
+  .yr-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    font-weight: 600;
+    color: #f0f0f0;
+  }
+  .yr-label.covid { color: var(--red); }
+
+  .yr-bar-wrap { height: 3px; background: #2a2a2a; }
+  .yr-bar { height: 100%; background: var(--yellow); }
+  .yr-bar.covid-bar { background: var(--red); }
+
+  .yr-trips {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: #888;
+    text-align: right;
+  }
+
+  .yr-note {
+    font-size: 10px;
+    color: var(--red);
+    font-weight: 600;
+    letter-spacing: 1px;
+  }
+
+  /*  SLIDE 2 — DOCKER + ARQUITECTURA  */
+  .s2 {
+    grid-template-rows: auto 1fr;
+    padding: 56px 64px 64px;
+    background: var(--bg);
+  }
+
+  .s2-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+
+  .s2-left { display: flex; flex-direction: column; gap: 14px; }
+  .s2-right { display: flex; flex-direction: column; gap: 14px; }
+
+  .info-block {
+    background: white;
+    border: 1px solid var(--border);
+    padding: 20px 22px;
+  }
+
+  .info-block .title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--dark);
+    margin-bottom: 8px;
+  }
+
+  .info-block .body {
+    font-size: 12px;
+    color: var(--mid);
+    line-height: 1.6;
+  }
+
+  .info-block .tag-yellow {
+    display: inline-block;
+    background: var(--yellow-light);
+    border: 1px solid var(--yellow);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    padding: 2px 7px;
+    color: #7a6000;
+    margin-bottom: 8px;
+    letter-spacing: 1px;
+  }
+
+  .container-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .container-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+  }
+
+  .container-item .dot-c {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .container-item .c-name {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--dark);
+    flex: 1;
+  }
+
+  .container-item .c-port {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+  }
+
+  .dag-flow {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 4px;
+  }
+
+  .dag-step {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    padding: 5px 10px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--mid);
+  }
+
+  .dag-arrow { font-size: 11px; color: var(--muted); }
+
+  /*  SLIDE 3 — ETAPA 1+2 PARQUET  */
+  .s3 {
+    grid-template-columns: 1fr 1fr;
+    background: var(--bg);
+  }
+
+  .s3-left {
+    padding: 56px 48px 64px;
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .s3-right {
+    padding: 56px 48px 64px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 14px;
+  }
+
+  .parquet-compare {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    margin-bottom: 20px;
+  }
+
+  .pc-col {
+    background: white;
+    padding: 16px;
+  }
+
+  .pc-col .pc-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .pc-col .pc-title.bad { color: var(--red); }
+  .pc-col .pc-title.good { color: var(--green); }
+
+  .pc-row { font-size: 11px; color: var(--mid); padding: 4px 0; border-bottom: 1px solid #f5f5f0; line-height: 1.4; }
+  .pc-row:last-child { border-bottom: none; }
+
+  .stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .stat-row:last-child { border-bottom: none; }
+  .stat-key { font-size: 12px; color: var(--mid); }
+  .stat-val { font-family: 'IBM Plex Mono', monospace; font-size: 13px; font-weight: 600; color: var(--dark); }
+  .stat-val.good { color: var(--green); }
+
+  .cmd-box {
+    background: var(--dark);
+    padding: 14px 18px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: #a0c4ff;
+    line-height: 1.8;
+  }
+  .cmd-box .comment { color: #555; }
+  .cmd-box .cmd { color: #90EE90; }
+
+  /*  SLIDE 4 — ETAPA 3 PARTE 1  */
+  .s4 {
+    padding: 56px 64px 64px;
+    background: var(--bg);
+    grid-template-rows: auto 1fr;
+  }
+
+  .code-section {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+
+  .code-block {
+    background: var(--dark);
+    padding: 20px 22px;
+    overflow: auto;
+  }
+
+  .code-block .cb-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #555;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #2a2a2a;
+  }
+
+  .code-block pre {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    line-height: 1.8;
+    color: #ccc;
+    white-space: pre-wrap;
+  }
+
+  .kw { color: #79b8ff; }
+  .fn { color: #b392f0; }
+  .str { color: #85e89d; }
+  .cm { color: #444; }
+  .num { color: #f8c555; }
+  .cls { color: #79b8ff; }
+
+  .concept-list { display: flex; flex-direction: column; gap: 10px; }
+
+  .concept-item {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    padding: 14px 16px;
+    background: white;
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--yellow);
+  }
+
+  .concept-item .ci-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--dark);
+    margin-bottom: 3px;
+  }
+
+  .concept-item .ci-body {
+    font-size: 11px;
+    color: var(--mid);
+    line-height: 1.5;
+  }
+
+  /*  SLIDE 5 — ETAPA 3 PARTE 2  */
+  .s5 {
+    grid-template-columns: 1fr 1fr;
+    background: var(--bg);
+  }
+
+  .s5-left {
+    padding: 56px 44px 64px;
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .s5-right {
+    padding: 56px 44px 64px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 12px;
+  }
+
+  .op-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 14px 16px;
+    background: white;
+    border: 1px solid var(--border);
+  }
+
+  .op-num {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--yellow);
+    flex-shrink: 0;
+    line-height: 1;
+    margin-top: 2px;
+  }
+
+  .op-title { font-size: 13px; font-weight: 700; color: var(--dark); margin-bottom: 3px; }
+  .op-body { font-size: 11px; color: var(--mid); line-height: 1.5; }
+
+  .shuffle-box {
+    background: #FFF8DC;
+    border: 1px solid var(--yellow);
+    padding: 14px 16px;
+    margin-top: 4px;
+  }
+
+  .shuffle-box .sb-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: #7a6000;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+  }
+
+  .shuffle-box .sb-body { font-size: 12px; color: var(--mid); line-height: 1.5; }
+
+  /*  SLIDE 6 — DUCKDB + SUPERSET  */
+  .s6 {
+    grid-template-columns: 1fr 1fr;
+    background: var(--dark);
+    color: #e0e0e0;
+  }
+
+  .s6-left {
+    padding: 56px 44px 64px;
+    border-right: 1px solid #2a2a2a;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 16px;
+  }
+
+  .s6-right {
+    padding: 56px 44px 64px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 16px;
+  }
+
+  .s6 .slide-tag { color: #555; }
+  .s6 .slide-heading { color: #e0e0e0; }
+
+  .dark-card {
+    background: #1a1a1a;
+    border: 1px solid #2a2a2a;
+    padding: 18px 20px;
+  }
+
+  .dark-card .dc-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--yellow);
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #2a2a2a;
+  }
+
+  .dark-card .dc-body { font-size: 12px; color: #888; line-height: 1.6; }
+
+  .vs-row {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid #2a2a2a;
+    font-size: 12px;
+  }
+  .vs-row:last-child { border-bottom: none; }
+  .vs-good { color: #90EE90; text-align: right; }
+  .vs-bad { color: #888; }
+  .vs-label { font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: #555; letter-spacing: 1px; text-align: center; text-transform: uppercase; }
+
+  .insight-row {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+    padding: 12px 0;
+    border-bottom: 1px solid #2a2a2a;
+  }
+  .insight-row:last-child { border-bottom: none; }
+
+  .ir-num {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 28px;
+    font-weight: 600;
+    color: var(--yellow);
+    flex-shrink: 0;
+    line-height: 1;
+  }
+
+  .ir-title { font-size: 13px; font-weight: 600; color: #e0e0e0; margin-bottom: 3px; }
+  .ir-body { font-size: 11px; color: #888; line-height: 1.5; }
+</style>
+</head>
+<body>
+
+<div class="progress" id="progress"></div>
+
+<div class="dots" id="dots"></div>
+
+<div class="nav-top">
+  <button class="nav-btn" id="prevBtn" onclick="prev()" title="Anterior">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+  </button>
+  <span class="counter" id="counter">1 / 7</span>
+  <button class="nav-btn" id="nextBtn" onclick="next()" title="Siguiente">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+  </button>
+  <button class="nav-btn" id="fsBtn" onclick="toggleFullscreen()" title="Pantalla completa">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+  </button>
+</div>
+
+<!-- 
+     SLIDE 0 — PORTADA
+ -->
+<div class="slide s1 active" data-slide="1" style="background:#0f0f0f;grid-template-columns:1fr 1fr;align-items:stretch;">
+
+  <!-- LEFT — título -->
+  <div style="display:flex;flex-direction:column;justify-content:center;padding:64px 56px;border-right:1px solid #1f1f1f;">
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:3px;color:#555;text-transform:uppercase;margin-bottom:24px;">Maestría en Ciencia de Datos · 2026</div>
+    <div style="font-size:11px;color:#888;font-family:'IBM Plex Mono',monospace;letter-spacing:3px;margin-bottom:14px;text-transform:uppercase;">NYC Yellow Taxi Analytics</div>
+    <div style="font-size:64px;font-weight:700;color:#ffffff;line-height:1;letter-spacing:-1px;">PROYECTO</div>
+    <div style="font-size:64px;font-weight:700;color:#00C2FF;line-height:1;letter-spacing:-1px;margin-bottom:28px;">SPARK</div>
+    <div style="width:36px;height:3px;background:#00C2FF;margin-bottom:32px;border-radius:2px;"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+      <div style="border:1px solid #1f1f1f;padding:12px;border-top:2px solid #00C2FF;">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:18px;font-weight:600;color:#00C2FF;">28M</div>
+        <div style="font-size:9px;color:#555;margin-top:4px;letter-spacing:1px;text-transform:uppercase;">viajes</div>
+      </div>
+      <div style="border:1px solid #1f1f1f;padding:12px;border-top:2px solid #00C2FF;">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:18px;font-weight:600;color:#00C2FF;">8 años</div>
+        <div style="font-size:9px;color:#555;margin-top:4px;letter-spacing:1px;text-transform:uppercase;">comparados</div>
+      </div>
+      <div style="border:1px solid #1f1f1f;padding:12px;border-top:2px solid #c0392b;">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:18px;font-weight:600;color:#c0392b;">−97%</div>
+        <div style="font-size:9px;color:#555;margin-top:4px;letter-spacing:1px;text-transform:uppercase;">COVID 2020</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT — integrantes -->
+  <div style="display:flex;flex-direction:column;justify-content:center;padding:64px 56px;">
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:3px;color:#555;text-transform:uppercase;margin-bottom:24px;padding-bottom:14px;border-bottom:1px solid #1f1f1f;">Grupo 2 · Integrantes</div>
+    <div style="display:flex;flex-direction:column;">
+      <div style="display:flex;align-items:center;gap:20px;padding:15px 0;border-bottom:1px solid #1a1a1a;">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#00C2FF;min-width:22px;">01</span>
+        <span style="font-size:14px;color:#d0d0d0;letter-spacing:0.2px;">Chino Huaycani Melbis</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:20px;padding:15px 0;border-bottom:1px solid #1a1a1a;">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#00C2FF;min-width:22px;">02</span>
+        <span style="font-size:14px;color:#d0d0d0;letter-spacing:0.2px;">Mamani Quispe Darwin Rigoberto</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:20px;padding:15px 0;border-bottom:1px solid #1a1a1a;">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#00C2FF;min-width:22px;">03</span>
+        <span style="font-size:14px;color:#d0d0d0;letter-spacing:0.2px;">Mendoza Mamani Lenin Bismarx</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:20px;padding:15px 0;border-bottom:1px solid #1a1a1a;">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#00C2FF;min-width:22px;">04</span>
+        <span style="font-size:14px;color:#d0d0d0;letter-spacing:0.2px;">Quispe Cartagena Jose Jhonatan</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:20px;padding:15px 0;border-bottom:1px solid #1a1a1a;">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#00C2FF;min-width:22px;">05</span>
+        <span style="font-size:14px;color:#d0d0d0;letter-spacing:0.2px;">Taco Aviles Milton Hiroshi</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:20px;padding:15px 0;">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#00C2FF;min-width:22px;">06</span>
+        <span style="font-size:14px;color:#d0d0d0;letter-spacing:0.2px;">Vilca Quispe Oscar Edy</span>
+      </div>
+    </div>
+    <div style="margin-top:28px;padding-top:20px;border-top:1px solid #1f1f1f;">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#444;letter-spacing:1px;">github.com/darig7w7/nyc-taxi-spark</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- 
+     SLIDE 1 — INTRO + DATOS
+ -->
+<div class="slide s1" data-slide="2">
+  <div class="s1-left">
+    <div class="slide-tag">02 / 07</div>
+    <div class="slide-heading">NYC Yellow<br>Taxi <em>Analytics</em><br>2019 – 2026</div>
+    <div class="s1-desc">
+      La NYC Taxi & Limousine Commission registra cada viaje de taxi amarillo en Nueva York. Con 28 millones de registros en 8 años — herramientas convencionales no son suficientes.
+    </div>
+    <div class="s1-badge">Apache Spark · PySpark · Parquet · Superset</div>
+  </div>
+  <div class="s1-right">
+    <div class="label" style="color:#555; margin-bottom:12px;">Abril por año — viajes registrados</div>
+    <div class="year-row"><span class="yr-label">2019</span><div class="yr-bar-wrap"><div class="yr-bar" style="width:100%"></div></div><span class="yr-trips">7.2 M</span><span class="yr-note"></span></div>
+    <div class="year-row"><span class="yr-label covid">2020</span><div class="yr-bar-wrap"><div class="yr-bar covid-bar" style="width:3%"></div></div><span class="yr-trips" style="color:#C0392B">205 K</span><span class="yr-note">COVID −97%</span></div>
+    <div class="year-row"><span class="yr-label">2021</span><div class="yr-bar-wrap"><div class="yr-bar" style="width:27%"></div></div><span class="yr-trips">1.9 M</span><span class="yr-note"></span></div>
+    <div class="year-row"><span class="yr-label">2022</span><div class="yr-bar-wrap"><div class="yr-bar" style="width:46%"></div></div><span class="yr-trips">3.3 M</span><span class="yr-note"></span></div>
+    <div class="year-row"><span class="yr-label">2023</span><div class="yr-bar-wrap"><div class="yr-bar" style="width:43%"></div></div><span class="yr-trips">3.0 M</span><span class="yr-note"></span></div>
+    <div class="year-row"><span class="yr-label">2024</span><div class="yr-bar-wrap"><div class="yr-bar" style="width:41%"></div></div><span class="yr-trips">2.9 M</span><span class="yr-note"></span></div>
+    <div class="year-row"><span class="yr-label">2025</span><div class="yr-bar-wrap"><div class="yr-bar" style="width:43%"></div></div><span class="yr-trips">3.0 M</span><span class="yr-note"></span></div>
+    <div class="year-row"><span class="yr-label">2026</span><div class="yr-bar-wrap"><div class="yr-bar" style="width:41%"></div></div><span class="yr-trips">2.9 M</span><span class="yr-note"></span></div>
+    <div style="margin-top:16px; padding-top:16px; border-top:1px solid #2a2a2a; font-family:'IBM Plex Mono',monospace; font-size:11px; color:#555;">Total: 28,058,885 viajes · 433 MB Parquet</div>
+  </div>
+</div>
+
+<!-- 
+     SLIDE 2 — DOCKER + ARQUITECTURA
+ -->
+<div class="slide s2" data-slide="3">
+  <div>
+    <div class="slide-tag">03 / 07</div>
+    <div class="slide-heading">Cluster <em>Spark</em> con Docker</div>
+  </div>
+  <div class="s2-grid">
+    <div class="s2-left">
+      <div class="info-block">
+        <div class="tag-yellow">DOCKER</div>
+        <div class="title">¿Por qué Docker?</div>
+        <div class="body">En producción Spark corre en cientos de servidores físicos. Docker simula ese cluster en una sola máquina con contenedores aislados — sin instalar Java, Spark ni configurar variables de entorno manualmente.</div>
+      </div>
+      <div class="info-block">
+        <div class="tag-yellow">CONTENEDORES</div>
+        <div class="title">3 servicios levantados</div>
+        <div class="container-stack">
+          <div class="container-item"><div class="dot-c" style="background:#00C2FF"></div><span class="c-name">nyc-spark-master</span><span class="c-port">:8080 · :7077</span></div>
+          <div class="container-item"><div class="dot-c" style="background:#1E7A4E"></div><span class="c-name">nyc-spark-worker</span><span class="c-port">8 cores · 2.7 GB</span></div>
+          <div class="container-item"><div class="dot-c" style="background:#1A5276"></div><span class="c-name">nyc-superset</span><span class="c-port">:8088</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="s2-right">
+      <div class="info-block">
+        <div class="tag-yellow">SPARK DRIVER vs WORKER</div>
+        <div class="title">Driver — el cerebro</div>
+        <div class="body">Ejecuta analytics.py, construye el DAG de operaciones, divide los datos en particiones y asigna Tasks a los Workers. Tiene visibilidad global del job. Corre en nyc-spark-job.</div>
+      </div>
+      <div class="info-block">
+        <div class="title">Worker — el ejecutor</div>
+        <div class="body">Recibe su partición de datos, aplica filtros y transformaciones en RAM, calcula métricas y devuelve el resultado al Driver. Solo conoce su fracción del dataset.</div>
+      </div>
+      <div class="info-block">
+        <div class="tag-yellow">DAG + LAZY EVALUATION</div>
+        <div class="title">Plan antes de ejecutar</div>
+        <div class="dag-flow">
+          <div class="dag-step">read</div><div class="dag-arrow">→</div>
+          <div class="dag-step">filter</div><div class="dag-arrow">→</div>
+          <div class="dag-step">join</div><div class="dag-arrow">→</div>
+          <div class="dag-step">groupBy</div><div class="dag-arrow">→</div>
+          <div class="dag-step">write </div>
+        </div>
+        <div class="body" style="margin-top:8px;">Spark no ejecuta nada hasta la acción final <code style="font-family:'IBM Plex Mono';font-size:10px">write()</code>. Construye y optimiza el plan completo antes de correr.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 
+     SLIDE 3 — ETAPA 1+2 · PARQUET + DESCARGA
+ -->
+<div class="slide s3" data-slide="4">
+  <div class="s3-left">
+    <div class="slide-tag">04 / 07</div>
+    <div class="slide-heading">Datos <em>Parquet</em><br>y Descarga</div>
+    <div class="label">CSV vs Parquet</div>
+    <div class="parquet-compare">
+      <div class="pc-col">
+        <div class="pc-title bad">CSV — por filas</div>
+        <div class="pc-row">Para AVG(fare) lee fila completa incluyendo las 19 columnas que no necesita</div>
+        <div class="pc-row">Sin compresión nativa</div>
+        <div class="pc-row">No guarda tipos de datos</div>
+        <div class="pc-row">Sin partition pruning</div>
+      </div>
+      <div class="pc-col">
+        <div class="pc-title good">Parquet — columnar</div>
+        <div class="pc-row">Para AVG(fare) lee solo la columna fare — ignora las demás</div>
+        <div class="pc-row">Compresión Snappy 5×</div>
+        <div class="pc-row">Guarda el esquema completo</div>
+        <div class="pc-row">Partition pruning automático</div>
+      </div>
+    </div>
+    <div style="background:white;border:1px solid var(--border);padding:16px;">
+      <div class="stat-row"><span class="stat-key">433 MB Parquet</span><span class="stat-val good">&gt; 2 GB en CSV</span></div>
+      <div class="stat-row"><span class="stat-key">Velocidad lectura</span><span class="stat-val good">10× más rápido</span></div>
+      <div class="stat-row"><span class="stat-key">Fuente oficial</span><span class="stat-val">NYC TLC</span></div>
+    </div>
+  </div>
+  <div class="s3-right">
+    <div class="label">Etapa 1 — Descarga con wget</div>
+    <div class="cmd-box">
+      <div class="comment"># Descarga directa desde TLC oficial</div>
+      <div class="cmd">wget ".../yellow_tripdata_2019-04.parquet"</div>
+      <div class="cmd">wget ".../yellow_tripdata_2020-04.parquet"</div>
+      <div class="comment"># ... hasta 2026</div>
+      <div class="cmd">wget ".../taxi_zone_lookup.csv"</div>
+    </div>
+    <div class="label">Etapa 2 — Levantar cluster</div>
+    <div class="cmd-box">
+      <div class="comment"># Levantar los 3 contenedores</div>
+      <div class="cmd">docker compose up spark-master \</div>
+      <div class="cmd">  spark-worker superset -d</div>
+      <div style="margin-top:8px; color:#555"># Verificar en:</div>
+      <div class="cmd">http://localhost:8080  # Spark UI</div>
+      <div class="cmd">http://localhost:8088  # Superset</div>
+    </div>
+    <div style="background:white;border:1px solid var(--border);padding:16px;">
+      <div class="stat-row"><span class="stat-key">Spark UI muestra</span><span class="stat-val">Alive Workers: 1</span></div>
+      <div class="stat-row"><span class="stat-key">Cores disponibles</span><span class="stat-val">8 cores</span></div>
+      <div class="stat-row"><span class="stat-key">RAM disponible</span><span class="stat-val">2.7 GiB</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- 
+     SLIDE 4 — ETAPA 3 PARTE 1 · SparkSession + limpieza
+ -->
+<div class="slide s4" data-slide="5">
+  <div>
+    <div class="slide-tag">05 / 07</div>
+    <div class="slide-heading">Job PySpark — <em>SparkSession</em>, Lectura y Limpieza</div>
+  </div>
+  <div class="code-section">
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <div class="code-block">
+        <div class="cb-label">1 · SparkSession — punto de entrada</div>
+        <pre><span class="kw">spark</span> = SparkSession.builder \
+  .appName(<span class="str">"NYC_Taxi_Analytics"</span>) \
+  .config(<span class="str">"spark.driver.memory"</span>, <span class="str">"4g"</span>) \
+  .getOrCreate()</pre>
+      </div>
+      <div class="code-block">
+        <div class="cb-label">2 · Leer Parquet — Spark divide en particiones</div>
+        <pre><span class="kw">for</span> anio <span class="kw">in</span> [<span class="num">2019</span>, <span class="num">2020</span>, ..., <span class="num">2026</span>]:
+  path = <span class="fn">f</span><span class="str">"data/yellow_tripdata_{anio}-04.parquet"</span>
+  df = spark.read.<span class="fn">parquet</span>(path)
+  df = df.<span class="fn">withColumn</span>(<span class="str">"anio"</span>, <span class="fn">lit</span>(anio))</pre>
+      </div>
+      <div class="code-block">
+        <div class="cb-label">3 · Limpieza — filtrar inválidos</div>
+        <pre>df_clean = df \
+  .<span class="fn">filter</span>(<span class="fn">col</span>(<span class="str">"trip_distance"</span>) &gt; <span class="num">0</span>) \
+  .<span class="fn">filter</span>(<span class="fn">col</span>(<span class="str">"fare_amount"</span>) &gt; <span class="num">0</span>) \
+  .<span class="fn">filter</span>(<span class="fn">col</span>(<span class="str">"passenger_count"</span>) &gt; <span class="num">0</span>)</pre>
+      </div>
+    </div>
+    <div class="concept-list">
+      <div class="concept-item">
+        <div>
+          <div class="ci-title">SparkSession</div>
+          <div class="ci-body">Punto de entrada al cluster. Sin SparkSession no hay conexión con el motor distribuido. Es el puente entre el código Python y Spark.</div>
+        </div>
+      </div>
+      <div class="concept-item">
+        <div>
+          <div class="ci-title">Particiones</div>
+          <div class="ci-body">Al leer el Parquet el Driver divide el archivo en particiones. Cada partición va a un Executor para procesarse en paralelo. Por defecto 2 × número de cores.</div>
+        </div>
+      </div>
+      <div class="concept-item">
+        <div>
+          <div class="ci-title">Transformaciones Lazy</div>
+          <div class="ci-body">filter() no ejecuta nada — solo agrega al DAG. Spark acumula todas las transformaciones y las optimiza antes de ejecutar en la acción final.</div>
+        </div>
+      </div>
+      <div class="concept-item">
+        <div>
+          <div class="ci-title">Registros eliminados</div>
+          <div class="ci-body">De 28,058,885 registros totales — 3,200,755 eran inválidos (11.4%). Datos reales siempre tienen errores: GPS fallido, tarifas negativas, viajes cancelados.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 
+     SLIDE 5 — ETAPA 3 PARTE 2 · JOIN + groupBy + write
+ -->
+<div class="slide s5" data-slide="6">
+  <div class="s5-left">
+    <div class="slide-tag">06 / 07</div>
+    <div class="slide-heading">JOIN, <em>métricas</em><br>y Parquet de salida</div>
+    <div class="code-block" style="margin-bottom:14px;">
+      <div class="cb-label">JOIN con zonas NYC</div>
+      <pre><span class="kw">zones</span> = spark.read.<span class="fn">csv</span>(<span class="str">"taxi_zone_lookup.csv"</span>)
+
+df_join = df_clean.<span class="fn">join</span>(zones,
+  df_clean.PULocationID == zones.LocationID,
+  how=<span class="str">"left"</span>)
+<span class="cm"># PULocationID=161 -> "Midtown" -> "Manhattan"</span></pre>
+    </div>
+    <div class="code-block">
+      <div class="cb-label">Agrupar + guardar particionado</div>
+      <pre>resultado = df.<span class="fn">groupBy</span>(<span class="str">"anio"</span>).<span class="fn">agg</span>(
+  <span class="fn">count</span>(<span class="str">"*"</span>).<span class="fn">alias</span>(<span class="str">"total_viajes"</span>),
+  <span class="fn">avg</span>(<span class="str">"fare_amount"</span>).<span class="fn">alias</span>(<span class="str">"tarifa_prom"</span>))
+
+resultado.write \
+  .<span class="fn">partitionBy</span>(<span class="str">"anio"</span>) \
+  .<span class="fn">parquet</span>(<span class="str">"output/comparativa_anual"</span>)</pre>
+    </div>
+    <div class="shuffle-box">
+      <div class="sb-title"> Shuffle — la operación más costosa</div>
+      <div class="sb-body">El JOIN y el groupBy requieren mover datos entre Workers por la red para que registros con el mismo key queden en el mismo Executor. Es la operación más lenta — por eso minimizamos los JOINs.</div>
+    </div>
+  </div>
+  <div class="s5-right">
+    <div class="label">Operaciones del job</div>
+    <div class="op-row"><div class="op-num">01</div><div><div class="op-title">Métricas calculadas</div><div class="op-body">duration_min, hora del día, hora_pico (mañana/tarde/mediodía/normal), tipo_pago (Tarjeta/Efectivo/Otro)</div></div></div>
+    <div class="op-row"><div class="op-num">02</div><div><div class="op-title">groupBy + agg</div><div class="op-body">Fase Map: cada Worker agrega su partición. Fase Shuffle: datos del mismo año al mismo Executor. Fase Reduce: resultado final por año.</div></div></div>
+    <div class="op-row"><div class="op-num">03</div><div><div class="op-title">partitionBy("anio")</div><div class="op-body">Crea carpeta por año en output/. Partition pruning: consultar 2026 salta los otros 7 años automáticamente.</div></div></div>
+    <div class="op-row"><div class="op-num">04</div><div><div class="op-title">Salidas generadas</div><div class="op-body">comparativa_anual · por_borough · top_rutas · tipo_pago · hora_pico · viajes_por_hora</div></div></div>
+  </div>
+</div>
+
+<!-- 
+     SLIDE 6 — DuckDB + Superset + Hadoop + Preguntas
+ -->
+<div class="slide s6" data-slide="7">
+  <div class="s6-left">
+    <div class="slide-tag">07 / 07</div>
+    <div class="slide-heading" style="font-size:30px;">DuckDB · <em>Superset</em><br>Spark vs Hadoop</div>
+    <div class="dark-card">
+      <div class="dc-title">DuckDB — puente SQL</div>
+      <div class="dc-body">Lee los Parquet de output/ directamente sin importar. Crea tablas SQL que Superset puede consultar. Zero configuración — embebido en Python. Alternativa a PostgreSQL para analítica local.</div>
+    </div>
+    <div class="dark-card">
+      <div class="dc-title">Superset — Dashboard</div>
+      <div class="dc-body">Plataforma BI open source creada por Airbnb en 2015. Usada por Netflix, Lyft y Dropbox. Alternativa gratuita a Tableau y Power BI. 40+ tipos de gráficos sin código.</div>
+    </div>
+    <div class="dark-card">
+      <div class="dc-title">Spark vs Hadoop MapReduce</div>
+      <div class="vs-row"><span class="vs-good">RAM — procesa en memoria</span><span class="vs-label">almacena</span><span class="vs-bad">Disco — escribe entre fases</span></div>
+      <div class="vs-row"><span class="vs-good">100× más rápido</span><span class="vs-label">velocidad</span><span class="vs-bad">Lento — I/O disco</span></div>
+      <div class="vs-row"><span class="vs-good">Python conciso</span><span class="vs-label">lenguaje</span><span class="vs-bad">Java verboso</span></div>
+      <div class="vs-row"><span class="vs-good">SQL + ML + Streaming</span><span class="vs-label">ecosistema</span><span class="vs-bad">Solo MapReduce</span></div>
+    </div>
+  </div>
+  <div class="s6-right">
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:2px;color:#555;text-transform:uppercase;margin-bottom:4px;">Resultados · Insights clave</div>
+    <div class="insight-row"><div class="ir-num">97%</div><div><div class="ir-title">Caída COVID — Abril 2020</div><div class="ir-body">De 7.2 millones a solo 205 mil viajes. El dato más dramático del análisis.</div></div></div>
+    <div class="insight-row"><div class="ir-num">52%</div><div><div class="ir-title">Inflación de tarifas 2019->2026</div><div class="ir-body">$13.11 -> $19.90 en 7 años. La inflación visible directamente en los datos.</div></div></div>
+    <div class="insight-row"><div class="ir-num">84%</div><div><div class="ir-title">Pagos con tarjeta en 2026</div><div class="ir-body">En 2019 era 72%. El efectivo cayó de 27% a 14% — la digitalización en números.</div></div></div>
+    <div class="dark-card" style="margin-top:4px;">
+      <div class="dc-title">Preguntas de discusión</div>
+      <div class="dc-body">
+        <strong style="color:#ccc">Driver vs Workers:</strong> Driver planifica y coordina. Workers ejecutan en paralelo sobre sus particiones.<br><br>
+        <strong style="color:#ccc">¿Por qué Parquet?</strong> Columnar, comprimido, partition pruning, guarda esquema.<br><br>
+        <strong style="color:#ccc">Spark vs Hadoop:</strong> RAM vs disco. 100× más rápido. Framework unificado.
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  let current = 1;
+  const total = 7;
+
+  // Build dots
+  const dotsEl = document.getElementById('dots');
+  for (let i = 1; i <= total; i++) {
+    const d = document.createElement('div');
+    d.className = 'dot' + (i === 1 ? ' active' : '');
+    d.onclick = () => goTo(i);
+    dotsEl.appendChild(d);
+  }
+
+  function updateUI() {
+    document.getElementById('counter').textContent = `${current} / ${total}`;
+    document.getElementById('progress').style.width = `${(current / total) * 100}%`;
+    document.getElementById('prevBtn').disabled = current === 1;
+    document.getElementById('nextBtn').disabled = current === total;
+    document.querySelectorAll('.dot').forEach((d, i) => d.classList.toggle('active', i === current - 1));
+  }
+
+  function goTo(n) {
+    if (n === current) return;
+    const slides = document.querySelectorAll('.slide');
+    slides.forEach(s => {
+      if (parseInt(s.dataset.slide) === current) {
+        s.classList.add('exit');
+        setTimeout(() => s.classList.remove('exit'), 500);
+      }
+      s.classList.remove('active');
+    });
+    current = n;
+    setTimeout(() => {
+      document.querySelector(`[data-slide="${current}"]`).classList.add('active');
+      updateUI();
+    }, 50);
+  }
+
+  function next() { if (current < total) goTo(current + 1); }
+  function prev() { if (current > 1) goTo(current - 1); }
+
+  const iconExpand = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>';
+  const iconCollapse = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="10" y1="14" x2="3" y2="21"/><line x1="21" y1="3" x2="14" y2="10"/></svg>';
+
+  function toggleFullscreen() {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen();
+    } else {
+      document.exitFullscreen();
+    }
+  }
+
+  document.addEventListener('fullscreenchange', () => {
+    const btn = document.getElementById('fsBtn');
+    btn.innerHTML = document.fullscreenElement ? iconCollapse : iconExpand;
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === ' ') next();
+    if (e.key === 'ArrowLeft') prev();
+    if (e.key === 'f' || e.key === 'F') toggleFullscreen();
+  });
+
+  updateUI();
+</script>
+</body>
+</html>
